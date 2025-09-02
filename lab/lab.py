@@ -1,7 +1,9 @@
 import cv2
+import numpy as np
 import robomaster
 from robomaster import robot
 from robomaster import vision
+# from lab import detact
 
 
 class MarkerInfo:
@@ -25,21 +27,38 @@ class MarkerInfo:
     def center(self):
         return int(self._x * 1280), int(self._y * 720)
 
-    @property
-    def text(self):
-        return self._info
+    # @property     
+    # def text(self):
+    #     return self._info
 
 
 markers = []
 
-
 def on_detect_marker(marker_info):
     number = len(marker_info)
     markers.clear()
+    # matchT = cv2.matchTemplate(img_process, mask2, cv2.TM_CCOEFF_NORMED)
     for i in range(0, number):
         x, y, w, h, info = marker_info[i]
         markers.append(MarkerInfo(x, y, w, h, info))
         print("marker:{0} x:{1}, y:{2}, w:{3}, h:{4}".format(info, x, y, w, h))
+
+# mask2 = detact.mask2
+
+def process_img(img):
+    img[600:,:] = (0,0,0)
+    blur = cv2.GaussianBlur(img, (7,7), 0)
+    img_hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
+
+    lower_red_1 = np.array([0, 50, 50], dtype=np.uint8)
+    upper_red_1 = np.array([10, 255, 255], dtype=np.uint8)
+    lower_red_2 = np.array([170, 50, 50], dtype=np.uint8)
+    upper_red_2 = np.array([180, 255, 255], dtype=np.uint8)
+
+    img_bi1 = cv2.inRange(img_hsv, lower_red_1, upper_red_1)
+    img_bi2 = cv2.inRange(img_hsv, lower_red_2, upper_red_2)
+    img_bi = cv2.bitwise_or(img_bi1, img_bi2)
+    return img_bi
 
 
 if __name__ == '__main__':
@@ -51,13 +70,15 @@ if __name__ == '__main__':
 
     ep_camera.start_video_stream(display=False)
     result = ep_vision.sub_detect_info(name="marker", callback=on_detect_marker)
-
+    
     for i in range(0, 500):
         img = ep_camera.read_cv2_image(strategy="newest", timeout=0.5)
+        img_process = process_img(img)
+
         for j in range(0, len(markers)):
             cv2.rectangle(img, markers[j].pt1, markers[j].pt2, (255, 255, 255))
-            cv2.putText(img, markers[j].text, markers[j].center, cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
-        cv2.imshow("Markers", img)
+            # cv2.putText(img, markers[j].text, markers[j].center, cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
+        cv2.imshow("Markers", img_process)
         cv2.waitKey(1)
     cv2.destroyAllWindows()
 
